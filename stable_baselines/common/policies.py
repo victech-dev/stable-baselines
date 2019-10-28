@@ -419,10 +419,9 @@ class LstmPolicy(RecurrentActorCriticPolicy):
                     extracted_features = cnn_extractor(self.processed_obs, **kwargs)
                 else:
                     extracted_features = tf.layers.flatten(self.processed_obs)
-                #VICTECH It seems that this code below must be functional for both "cnn" and "mlp"
-                for i, layer_size in enumerate(layers):
-                    extracted_features = act_fun(linear(extracted_features, 'pi_fc' + str(i), n_hidden=layer_size,
-                                                        init_scale=np.sqrt(2)))
+                    for i, layer_size in enumerate(layers):
+                        extracted_features = act_fun(linear(extracted_features, 'pi_fc' + str(i), n_hidden=layer_size,
+                                                            init_scale=np.sqrt(2)))
                 input_sequence = batch_to_seq(extracted_features, self.n_env, n_steps)
                 masks = batch_to_seq(self.dones_ph, self.n_env, n_steps)
                 rnn_output, self.snew = lstm(input_sequence, masks, self.states_ph, 'lstm1', n_hidden=n_lstm,
