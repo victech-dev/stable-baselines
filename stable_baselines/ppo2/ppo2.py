@@ -113,13 +113,9 @@ class PPO2(ActorCriticRLModel):
 
             self.n_batch = self.n_envs * self.n_steps
 
-            n_cpu = multiprocessing.cpu_count()
-            if sys.platform == 'darwin':
-                n_cpu //= 2
-
             self.graph = tf.Graph()
             with self.graph.as_default():
-                self.sess = tf_util.make_session(num_cpu=n_cpu, graph=self.graph)
+                self.sess = tf_util.make_session(graph=self.graph)
 
                 n_batch_step = None
                 n_batch_train = None
@@ -457,6 +453,27 @@ class Runner(AbstractEnvRunner):
             - states: (np.ndarray) the internal states of the recurrent policies
             - infos: (dict) the extra information of the model
         """
+        ################ BEGIN VICTECH ################
+        # During training from real envirinment, first step of a minibatch usually experience 
+        # long time latency between last observation and next action. This seems to be caused 
+        # by last minibatch's train step which goes through gradient descent calculation 
+        # and tensorboard logging. 
+        # To describe more strictly, let the time series be like these: 
+        # { ..., (Obs_mb1_126, Act_mb1_126), (Obs_mb1_127, Act_mb1_127), 
+        #   training with minibatch, 
+        #   (Obs_mb2_0, Act_mb2_0), (Obs_mb2_1, Act_mb2_1), ... }
+        # As the senario described above, Obs_mb2_0 cannot be the direct result of 
+        # Act_mb1_127, since several actual frames has been lost during training time 
+        # (this could be bigger than fixed delta time).
+        # Eventually, for accurate traing from real environment, we need to skip the first
+        # step of a minibatch which easily be flawed by long time latency from last step.
+        # So, let's just consume and skip the first sample of this minibatch.
+        actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
+        clipped_actions = actions
+        if isinstance(self.env.action_space, gym.spaces.Box):
+            clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
+        self.obs[:], rewards, self.dones, infos = self.env.step(clipped_actions)
+        ################ END VICTECH ################
         # mb stands for minibatch
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [], [], [], [], [], []
         mb_states = self.states
