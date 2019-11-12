@@ -278,19 +278,21 @@ class BernoulliProbabilityDistributionType(ProbabilityDistributionType):
 
 
 class CategoricalProbabilityDistribution(ProbabilityDistribution):
-    def __init__(self, logits):
+    def __init__(self, logits, action_dtype=tf.int32):
         """
         Probability distributions from categorical input
 
         :param logits: ([float]) the categorical logits input
+        :param action_dtype: (tf.type) type of result action
         """
         self.logits = logits
+        self.action_dtype = action_dtype
 
     def flatparam(self):
         return self.logits
 
     def mode(self):
-        return tf.argmax(self.logits, axis=-1)
+        return tf.cast(tf.argmax(self.logits, axis=-1), self.action_dtype)
 
     def neglogp(self, x):
         # Note: we can't use sparse_softmax_cross_entropy_with_logits because
@@ -321,7 +323,7 @@ class CategoricalProbabilityDistribution(ProbabilityDistribution):
         # Gumbel-max trick to sample
         # a categorical distribution (see http://amid.fish/humble-gumbel)
         uniform = tf.random_uniform(tf.shape(self.logits), dtype=self.logits.dtype)
-        return tf.argmax(self.logits - tf.log(-tf.log(uniform)), axis=-1)
+        return tf.cast(tf.argmax(self.logits - tf.log(-tf.log(uniform)), axis=-1), self.action_dtype)
 
     @classmethod
     def fromflat(cls, flat):
