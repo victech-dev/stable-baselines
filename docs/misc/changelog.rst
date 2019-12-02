@@ -6,6 +6,96 @@ Changelog
 For download links, please look at `Github release page <https://github.com/hill-a/stable-baselines/releases>`_.
 
 
+Pre-Release 2.8.1a0 (WIP)
+--------------------------
+
+Breaking Changes:
+^^^^^^^^^^^^^^^^^
+
+New Features:
+^^^^^^^^^^^^^
+
+Bug Fixes:
+^^^^^^^^^^
+
+Deprecations:
+^^^^^^^^^^^^^
+
+Others:
+^^^^^^^
+
+Documentation:
+^^^^^^^^^^^^^^
+
+
+Release 2.8.0 (2019-09-29)
+--------------------------
+
+**MPI dependency optional, new save format, ACKTR with continuous actions**
+
+Breaking Changes:
+^^^^^^^^^^^^^^^^^
+- OpenMPI-dependent algorithms (PPO1, TRPO, GAIL, DDPG) are disabled in the
+  default installation of stable_baselines. `mpi4py` is now installed as an
+  extra. When `mpi4py` is not available, stable-baselines skips imports of
+  OpenMPI-dependent algorithms.
+  See :ref:`installation notes <openmpi>` and
+  `Issue #430 <https://github.com/hill-a/stable-baselines/issues/430>`_.
+- SubprocVecEnv now defaults to a thread-safe start method, `forkserver` when
+  available and otherwise `spawn`. This may require application code be
+  wrapped in `if __name__ == '__main__'`. You can restore previous behavior
+  by explicitly setting `start_method = 'fork'`. See
+  `PR #428 <https://github.com/hill-a/stable-baselines/pull/428>`_.
+- Updated dependencies: tensorflow v1.8.0 is now required
+- Removed `checkpoint_path` and `checkpoint_freq` argument from `DQN` that were not used
+- Removed `bench/benchmark.py` that was not used
+- Removed several functions from `common/tf_util.py` that were not used
+- Removed `ppo1/run_humanoid.py`
+
+New Features:
+^^^^^^^^^^^^^
+- **important change** Switch to using zip-archived JSON and Numpy `savez` for
+  storing models for better support across library/Python versions. (@Miffyli)
+- ACKTR now supports continuous actions
+- Add `double_q` argument to `DQN` constructor
+
+Bug Fixes:
+^^^^^^^^^^
+- Skip automatic imports of OpenMPI-dependent algorithms to avoid an issue
+  where OpenMPI would cause stable-baselines to hang on Ubuntu installs.
+  See :ref:`installation notes <openmpi>` and
+  `Issue #430 <https://github.com/hill-a/stable-baselines/issues/430>`_.
+- Fix a bug when calling `logger.configure()` with MPI enabled (@keshaviyengar)
+- set `allow_pickle=True` for numpy>=1.17.0 when loading expert dataset
+- Fix a bug when using VecCheckNan with numpy ndarray as state.  `Issue #489 <https://github.com/hill-a/stable-baselines/issues/489>`_. (@ruifeng96150)
+
+Deprecations:
+^^^^^^^^^^^^^
+- Models saved with cloudpickle format (stable-baselines<=2.7.0) are now
+  deprecated in favor of zip-archive format for better support across
+  Python/Tensorflow versions. (@Miffyli)
+
+Others:
+^^^^^^^
+- Implementations of noise classes (`AdaptiveParamNoiseSpec`, `NormalActionNoise`,
+  `OrnsteinUhlenbeckActionNoise`) were moved from `stable_baselines.ddpg.noise`
+  to `stable_baselines.common.noise`. The API remains backward-compatible;
+  for example `from stable_baselines.ddpg.noise import NormalActionNoise` is still
+  okay. (@shwang)
+- Docker images were updated
+- Cleaned up files in `common/` folder and in `acktr/` folder that were only used by old ACKTR version
+  (e.g. `filter.py`)
+- Renamed `acktr_disc.py` to `acktr.py`
+
+Documentation:
+^^^^^^^^^^^^^^
+- Add WaveRL project (@jaberkow)
+- Add Fenics-DRL project (@DonsetPG)
+- Fix and rename custom policy names (@eavelardev)
+- Add documentation on exporting models.
+- Update maintainers list (Welcome to @Miffyli)
+
+
 Release 2.7.0 (2019-07-31)
 --------------------------
 
@@ -398,7 +488,7 @@ Maintainers
 -----------
 
 Stable-Baselines is currently maintained by `Ashley Hill`_ (aka @hill-a), `Antonin Raffin`_ (aka `@araffin`_),
-`Maximilian Ernestus`_ (aka @erniejunior) and `Adam Gleave`_ (`@AdamGleave`_).
+`Maximilian Ernestus`_ (aka @erniejunior), `Adam Gleave`_ (`@AdamGleave`_) and `Anssi Kanervisto`_ (aka `@Miffyli`_).
 
 .. _Ashley Hill: https://github.com/hill-a
 .. _Antonin Raffin: https://araffin.github.io/
@@ -406,6 +496,9 @@ Stable-Baselines is currently maintained by `Ashley Hill`_ (aka @hill-a), `Anton
 .. _Adam Gleave: https://gleave.me/
 .. _@araffin: https://github.com/araffin
 .. _@AdamGleave: https://github.com/adamgleave
+.. _Anssi Kanervisto: https://github.com/Miffyli
+.. _@Miffyli: https://github.com/Miffyli
+
 
 Contributors (since v2.0.0):
 ----------------------------
@@ -414,4 +507,4 @@ In random order...
 Thanks to @bjmuld @iambenzo @iandanforth @r7vme @brendenpetersen @huvar @abhiskk @JohannesAck
 @EliasHasle @mrakgr @Bleyddyn @antoine-galataud @junhyeokahn @AdamGleave @keshaviyengar @tperol
 @XMaster96 @kantneel @Pastafarianist @GerardMaggiolino @PatrickWalter214 @yutingsz @sc420 @Aaahh @billtubbs
-@Miffyli @dwiel @miguelrass @qxcv
+@Miffyli @dwiel @miguelrass @qxcv @jaberkow @eavelardev @ruifeng96150

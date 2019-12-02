@@ -5,10 +5,9 @@ import gym
 import pytest
 import numpy as np
 
-from stable_baselines import A2C, SAC, DDPG, PPO1, PPO2, TRPO, TD3
+from stable_baselines import A2C, ACKTR, SAC, DDPG, PPO1, PPO2, TRPO, TD3
 # TODO: add support for continuous actions
 # from stable_baselines.acer import ACER
-# from stable_baselines.acktr import ACKTR
 from stable_baselines.common import set_global_seeds
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines.common.identity_env import IdentityEnvBox
@@ -22,7 +21,7 @@ NUM_TIMESTEPS = 15000
 MODEL_LIST = [
     A2C,
     # ACER,
-    # ACKTR,
+    ACKTR,
     DDPG,
     PPO1,
     PPO2,
@@ -59,7 +58,7 @@ def test_model_manipulation(request, model_class):
         acc_reward = sum(acc_reward) / N_TRIALS
 
         # saving
-        model_fname = './test_model_{}.pkl'.format(request.node.name)
+        model_fname = './test_model_{}.zip'.format(request.node.name)
         model.save(model_fname)
 
         del model, env
@@ -144,8 +143,8 @@ def test_model_manipulation(request, model_class):
         del model, env
 
     finally:
-        if os.path.exists("./test_model"):
-            os.remove("./test_model")
+        if os.path.exists("./test_model.zip"):
+            os.remove("./test_model.zip")
 
 
 def test_ddpg():
@@ -178,9 +177,9 @@ def test_ddpg_normalization():
     model.learn(1000)
     obs_rms_params = model.sess.run(model.obs_rms_params)
     ret_rms_params = model.sess.run(model.ret_rms_params)
-    model.save('./test_ddpg.pkl')
+    model.save('./test_ddpg.zip')
 
-    loaded_model = DDPG.load('./test_ddpg.pkl')
+    loaded_model = DDPG.load('./test_ddpg.zip')
     obs_rms_params_2 = loaded_model.sess.run(loaded_model.obs_rms_params)
     ret_rms_params_2 = loaded_model.sess.run(loaded_model.ret_rms_params)
 
@@ -190,8 +189,8 @@ def test_ddpg_normalization():
 
     del model, loaded_model
 
-    if os.path.exists("./test_ddpg.pkl"):
-        os.remove("./test_ddpg.pkl")
+    if os.path.exists("./test_ddpg.zip"):
+        os.remove("./test_ddpg.zip")
 
 
 def test_ddpg_popart():

@@ -12,7 +12,7 @@ if sys.version_info.major != 3:
 install_tf, tf_gpu = False, False
 try:
     import tensorflow as tf
-    if tf.__version__ < LooseVersion('1.5.0'):
+    if tf.__version__ < LooseVersion('1.8.0'):
         install_tf = True
         # check if a gpu version is needed
         tf_gpu = tf.test.is_gpu_available()
@@ -29,7 +29,7 @@ except ImportError:
 
 tf_dependency = []
 if install_tf:
-    tf_dependency = ['tensorflow-gpu>=1.5.0'] if tf_gpu else ['tensorflow>=1.5.0']
+    tf_dependency = ['tensorflow-gpu>=1.8.0'] if tf_gpu else ['tensorflow>=1.8.0']
     if tf_gpu:
         print("A GPU was detected, tensorflow-gpu will be installed")
 
@@ -109,7 +109,6 @@ setup(name='stable_baselines',
           'gym[atari,classic_control]>=0.10.9',
           'scipy',
           'joblib',
-          'mpi4py',
           'cloudpickle>=0.5.5',
           'opencv-python',
           'numpy',
@@ -117,6 +116,9 @@ setup(name='stable_baselines',
           'matplotlib'
       ] + tf_dependency,
       extras_require={
+        'mpi': [
+            'mpi4py',
+        ],
         'tests': [
             'pytest',
             'pytest-cov',
@@ -138,7 +140,7 @@ setup(name='stable_baselines',
       license="MIT",
       long_description=long_description,
       long_description_content_type='text/markdown',
-      version="2.7.0",
+      version="2.8.0",
       )
 
 # python setup.py sdist

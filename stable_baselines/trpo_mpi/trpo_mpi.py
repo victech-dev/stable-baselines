@@ -178,6 +178,7 @@ class TRPO(ActorCriticRLModel):
                         start += var_size
                     gvp = tf.add_n([tf.reduce_sum(grad * tangent)
                                     for (grad, tangent) in zipsame(klgrads, tangents)])  # pylint: disable=E1111
+                    # Fisher vector products
                     fvp = tf_util.flatgrad(gvp, var_list)
 
                     tf.summary.scalar('entropy_loss', meanent)
@@ -486,7 +487,7 @@ class TRPO(ActorCriticRLModel):
 
         return self
 
-    def save(self, save_path):
+    def save(self, save_path, cloudpickle=False):
         if self.using_gail and self.expert_dataset is not None:
             # Exit processes to pickle the dataset
             self.expert_dataset.prepare_pickling()
@@ -518,4 +519,4 @@ class TRPO(ActorCriticRLModel):
 
         params_to_save = self.get_parameters()
 
-        self._save_to_file(save_path, data=data, params=params_to_save)
+        self._save_to_file(save_path, data=data, params=params_to_save, cloudpickle=cloudpickle)
