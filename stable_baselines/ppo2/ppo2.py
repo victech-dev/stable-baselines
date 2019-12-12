@@ -439,6 +439,27 @@ class Runner(AbstractEnvRunner):
         self.lam = lam
         self.gamma = gamma
 
+    def _get_nextvalues(self, obs, states, dones, infos, values=None):
+        assert dones.dtype == np.bool
+        if np.any(dones):
+            # zero-fill values(tp1) of terminal
+            values = self.model.value(obs, states, dones) if values is None else values.copy()
+            values[dones] = 0
+            # restore truncated terminal observation
+            truncated, terminal_obs = None, None
+            for idx, info in enumerate(infos):
+                if dones[idx] and info.get('TimeLimit.truncated', False):
+                    if truncated is None: 
+                        truncated = np.zeros_like(dones)
+                    truncated[idx] = True
+                    if terminal_obs is None:
+                        terminal_obs = np.zeros_like(obs)
+                    terminal_obs[idx] = info['terminal_observation']
+            # bootstrap values(tp1) of truncated terminal
+            if terminal_obs is not None:
+                values[truncated] = self.model.value(terminal_obs, states, np.zeros_like(dones, dtype=np.float32))
+        return self.model.value(obs, states, dones) if values is None else values
+
     def run(self):
         """
         Run a learning step of the model
@@ -475,11 +496,14 @@ class Runner(AbstractEnvRunner):
         self.obs[:], rewards, self.dones, infos = self.env.step(clipped_actions)
         ################ END VICTECH ################
         # mb stands for minibatch
-        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [], [], [], [], [], []
+        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs, mb_nextvalues = [], [], [], [], [], [], []
         mb_states = self.states
         ep_infos = []
         for _ in range(self.n_steps):
-            actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
+            prevstates = self.states
+            actions, values, self.states, neglogpacs = self.model.step(self.obs, prevstates, self.dones)
+            if len(mb_values) > 0:
+                mb_nextvalues.append(self._get_nextvalues(self.obs, prevstates, self.dones, infos, values))
             mb_obs.append(self.obs.copy())
             mb_actions.append(actions)
             mb_values.append(values)
@@ -502,7 +526,7 @@ class Runner(AbstractEnvRunner):
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
         mb_dones = np.asarray(mb_dones, dtype=np.bool)
-        last_values = self.model.value(self.obs, self.states, self.dones)
+        mb_nextvalues.append(self._get_nextvalues(self.obs, self.states, self.dones, infos))
         # discount/bootstrap off value fn
         mb_advs = np.zeros_like(mb_rewards)
         true_reward = np.copy(mb_rewards)
@@ -510,11 +534,9 @@ class Runner(AbstractEnvRunner):
         for step in reversed(range(self.n_steps)):
             if step == self.n_steps - 1:
                 nextnonterminal = 1.0 - self.dones
-                nextvalues = last_values
             else:
                 nextnonterminal = 1.0 - mb_dones[step + 1]
-                nextvalues = mb_values[step + 1]
-            delta = mb_rewards[step] + self.gamma * nextvalues * nextnonterminal - mb_values[step]
+            delta = mb_rewards[step] + self.gamma * mb_nextvalues[step] - mb_values[step]
             mb_advs[step] = last_gae_lam = delta + self.gamma * self.lam * nextnonterminal * last_gae_lam
         mb_returns = mb_advs + mb_values
 
