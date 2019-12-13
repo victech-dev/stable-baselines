@@ -440,7 +440,6 @@ class Runner(AbstractEnvRunner):
         self.gamma = gamma
 
     def _get_nextvalues(self, obs, states, dones, infos, values=None):
-        assert dones.dtype == np.bool
         if np.any(dones):
             # zero-fill values(tp1) of terminal
             values = self.model.value(obs, states, dones) if values is None else values.copy()
@@ -449,16 +448,15 @@ class Runner(AbstractEnvRunner):
             truncated, terminal_obs = None, None
             for idx, info in enumerate(infos):
                 if dones[idx] and info.get('TimeLimit.truncated', False):
-                    if truncated is None: 
-                        truncated = np.zeros_like(dones)
+                    truncated = truncated or np.zeros_like(dones)
                     truncated[idx] = True
-                    if terminal_obs is None:
-                        terminal_obs = np.zeros_like(obs)
+                    terminal_obs = terminal_obs or np.zeros_like(obs)
                     terminal_obs[idx] = info['terminal_observation']
             # bootstrap values(tp1) of truncated terminal
             if terminal_obs is not None:
-                values[truncated] = self.model.value(terminal_obs, states, np.zeros_like(dones, dtype=np.float32))
-        return self.model.value(obs, states, dones) if values is None else values
+                bootstrapped = self.model.value(terminal_obs, states, np.zeros_like(dones))
+                values[truncated] = bootstrapped[truncated]
+        return values or self.model.value(obs, states, dones)
 
     def run(self):
         """
@@ -502,13 +500,13 @@ class Runner(AbstractEnvRunner):
         for _ in range(self.n_steps):
             prevstates = self.states
             actions, values, self.states, neglogpacs = self.model.step(self.obs, prevstates, self.dones)
-            if len(mb_values) > 0:
-                mb_nextvalues.append(self._get_nextvalues(self.obs, prevstates, self.dones, infos, values))
             mb_obs.append(self.obs.copy())
             mb_actions.append(actions)
             mb_values.append(values)
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
+            if len(mb_values) > 1:
+                mb_nextvalues.append(self._get_nextvalues(self.obs, prevstates, self.dones, infos, values))
             clipped_actions = actions
             # Clip the actions to avoid out of bound error
             if isinstance(self.env.action_space, gym.spaces.Box):
