@@ -482,7 +482,7 @@ def make_proba_dist_type(ac_space):
     """
     if isinstance(ac_space, spaces.Box):
         assert len(ac_space.shape) == 1, "Error: the action space must be a vector"
-        squashed = 'Squashed' in type(ac_space).__name__
+        squashed = getattr(ac_space, 'squashed', False)
         return DiagGaussianProbabilityDistributionType(ac_space.shape[0], squashed=squashed)
     elif isinstance(ac_space, spaces.Discrete):
         return CategoricalProbabilityDistributionType(ac_space.n)
