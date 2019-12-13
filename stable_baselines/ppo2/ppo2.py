@@ -456,7 +456,7 @@ class Runner(AbstractEnvRunner):
             if terminal_obs is not None:
                 bootstrapped = self.model.value(terminal_obs, states, np.zeros_like(dones))
                 values[truncated] = bootstrapped[truncated]
-        return values or self.model.value(obs, states, dones)
+        return self.model.value(obs, states, dones) if values is None else values
 
     def run(self):
         """
