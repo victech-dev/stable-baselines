@@ -448,9 +448,11 @@ class Runner(AbstractEnvRunner):
             truncated, terminal_obs = None, None
             for idx, info in enumerate(infos):
                 if dones[idx] and info.get('TimeLimit.truncated', False):
-                    truncated = np.zeros_like(dones) if truncated is None else truncated
+                    if truncated is None:
+                        truncated = np.zeros_like(dones)
                     truncated[idx] = True
-                    terminal_obs = np.zeros_like(obs) if terminal_obs is None else terminal_obs
+                    if terminal_obs is None:
+                        terminal_obs = np.zeros_like(obs)
                     terminal_obs[idx] = info['terminal_observation']
             # bootstrap values(tp1) of truncated terminal
             if terminal_obs is not None:
