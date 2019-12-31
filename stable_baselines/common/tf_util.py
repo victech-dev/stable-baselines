@@ -53,13 +53,10 @@ def make_session(num_cpu=None, make_default=False, graph=None):
     :param graph: (TensorFlow Graph) the graph of the session
     :return: (TensorFlow session)
     """
-    ################ BEGIN VICTECH ################
-    # Allow to fine-tune cpu/gpu count by setting os.environ variables
-    # For example, before create stable-baseline rl instances, set these:
-    # os.environ['SB_SESSION_CONFIG_NUM_CPU'] = '1' -> limit cpu to 1 (single threaded session)
-    # os.environ['SB_SESSION_CONFIG_NUM_GPU'] = '0' -> disable gpu
     if num_cpu is None:
-        num_cpu = int(os.getenv('SB_SESSION_CONFIG_NUM_CPU', multiprocessing.cpu_count()))
+        num_cpu = int(os.getenv('RCALL_NUM_CPU', multiprocessing.cpu_count()))
+    ################ BEGIN VICTECH ################
+    # os.environ['SB_SESSION_CONFIG_NUM_GPU'] = '0' -> disable gpu
     device_count = {} if os.getenv('SB_SESSION_CONFIG_NUM_GPU') is None else {'GPU': int(os.getenv('SB_SESSION_CONFIG_NUM_GPU'))}
     tf_config = tf.ConfigProto(
         device_count=device_count,
