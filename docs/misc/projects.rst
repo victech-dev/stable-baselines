@@ -136,3 +136,45 @@ Designing an autonomous robot to perform a task involves interactions between va
 | Github: https://github.com/harvard-edge/airlearning
 | Paper: https://arxiv.org/pdf/1906.00421.pdf
 | Video: https://www.youtube.com/watch?v=oakzGnh7Llw (Simulation), https://www.youtube.com/watch?v=cvO5YOzI0mg (on a CrazyFlie Nano-Drone)
+
+
+Snake Game AI
+--------------------------
+AI to play the classic snake game. 
+The game was trained using PPO2 available from stable-baselines and
+then exported to tensorflowjs to run directly on the browser
+
+| Author: Pedro Torres (@pedrohbtp)
+| Repository: https://github.com/pedrohbtp/snake-rl
+| Website: https://www.pedro-torres.com/snake-rl/
+
+
+Pwnagotchi
+--------------------------
+Pwnagotchi is an A2C-based “AI” powered by bettercap and running on a Raspberry Pi Zero W that learns from its surrounding WiFi environment in order to maximize the crackable WPA key material it captures (either through passive sniffing or by performing deauthentication and association attacks). This material is collected on disk as PCAP files containing any form of handshake supported by hashcat, including full and half WPA handshakes as well as PMKIDs.
+
+| Author: Simone Margaritelli (@evilsocket)
+| Repository: https://github.com/evilsocket/pwnagotchi
+| Website: https://pwnagotchi.ai/
+
+
+Quantized Reinforcement Learning (QuaRL)
+----------------------------------------
+
+QuaRL is a open-source framework to study the effects of quantization broad spectrum of reinforcement learning algorithms. The RL algorithms we used in
+this study are from stable-baselines.
+
+| Author: Srivatsan Krishnan, Sharad Chitlangia, Maximilian Lam, Zishen Wan, Aleksandra Faust, Vijay Janapa Reddi
+| Email: srivatsan@seas.harvard.edu
+| Github: https://github.com/harvard-edge/quarl
+| Paper: https://arxiv.org/pdf/1910.01055.pdf
+
+
+PPO_CPP: C++ version of a Deep Reinforcement Learning algorithm PPO
+-------------------------------------------------------------------
+Executes PPO at C++ level yielding notable execution performance speedups.
+Uses Stable Baselines to create a computational graph which is then used for training with custom environments by machine-code-compiled binary.
+
+| Authors: Szymon Brych
+| Email: szymon.brych@gmail.com
+| GitHub: https://github.com/Antymon/ppo_cpp

@@ -1,6 +1,5 @@
 import time
 import sys
-import multiprocessing
 from collections import deque
 
 import gym
@@ -45,15 +44,20 @@ class PPO2(ActorCriticRLModel):
     :param policy_kwargs: (dict) additional arguments to be passed to the policy on creation
     :param full_tensorboard_log: (bool) enable additional logging when using tensorboard
         WARNING: this logging can take a lot of space quickly
+    :param seed: (int) Seed for the pseudo-random generators (python, numpy, tensorflow).
+        If None (default), use random seed. Note that if you want completely deterministic
+        results, you must set `n_cpu_tf_sess` to 1.
+    :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
+        If None, the number of cpu of the current machine will be used.
     """
-
     def __init__(self, policy, env, gamma=0.99, n_steps=128, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
-                 full_tensorboard_log=False):
+                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
 
         super(PPO2, self).__init__(policy=policy, env=env, verbose=verbose, requires_vec_env=True,
-                                   _init_setup_model=_init_setup_model, policy_kwargs=policy_kwargs)
+                                   _init_setup_model=_init_setup_model, policy_kwargs=policy_kwargs,
+                                   seed=seed, n_cpu_tf_sess=n_cpu_tf_sess)
 
         self.learning_rate = learning_rate
         self.cliprange = cliprange
@@ -115,7 +119,8 @@ class PPO2(ActorCriticRLModel):
 
             self.graph = tf.Graph()
             with self.graph.as_default():
-                self.sess = tf_util.make_session(graph=self.graph)
+                self.set_random_seed(self.seed)
+                self.sess = tf_util.make_session(num_cpu=self.n_cpu_tf_sess, graph=self.graph)
 
                 n_batch_step = None
                 n_batch_train = None
@@ -215,7 +220,7 @@ class PPO2(ActorCriticRLModel):
                     if self.clip_range_vf_ph is not None:
                         tf.summary.scalar('clip_range_vf', tf.reduce_mean(self.clip_range_vf_ph))
 
-                    tf.summary.scalar('old_neglog_action_probabilty', tf.reduce_mean(self.old_neglog_pac_ph))
+                    tf.summary.scalar('old_neglog_action_probability', tf.reduce_mean(self.old_neglog_pac_ph))
                     tf.summary.scalar('old_value_pred', tf.reduce_mean(self.old_vpred_ph))
 
                     if self.full_tensorboard_log:
@@ -223,7 +228,7 @@ class PPO2(ActorCriticRLModel):
                         tf.summary.histogram('learning_rate', self.learning_rate_ph)
                         tf.summary.histogram('advantage', self.advs_ph)
                         tf.summary.histogram('clip_range', self.clip_range_ph)
-                        tf.summary.histogram('old_neglog_action_probabilty', self.old_neglog_pac_ph)
+                        tf.summary.histogram('old_neglog_action_probability', self.old_neglog_pac_ph)
                         tf.summary.histogram('old_value_pred', self.old_vpred_ph)
                         if tf_util.is_image(self.observation_space):
                             tf.summary.image('observation', train_model.obs_ph)
@@ -298,7 +303,7 @@ class PPO2(ActorCriticRLModel):
 
         return policy_loss, value_loss, policy_entropy, approxkl, clipfrac
 
-    def learn(self, total_timesteps, callback=None, seed=None, log_interval=1, tb_log_name="PPO2",
+    def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2",
               reset_num_timesteps=True):
         # Transform to callable if needed
         self.learning_rate = get_schedule_fn(self.learning_rate)
@@ -309,7 +314,7 @@ class PPO2(ActorCriticRLModel):
 
         with SetVerbosity(self.verbose), TensorboardWriter(self.graph, self.tensorboard_log, tb_log_name, new_tb_log) \
                 as writer:
-            self._setup_learn(seed)
+            self._setup_learn()
 
             runner = Runner(env=self.env, model=self, n_steps=self.n_steps, gamma=self.gamma, lam=self.lam)
             self.episode_reward = np.zeros((self.n_envs,))
@@ -319,7 +324,11 @@ class PPO2(ActorCriticRLModel):
 
             n_updates = total_timesteps // self.n_batch
             for update in range(1, n_updates + 1):
-                assert self.n_batch % self.nminibatches == 0
+                assert self.n_batch % self.nminibatches == 0, ("The number of minibatches (`nminibatches`) "
+                                                               "is not a factor of the total number of samples "
+                                                               "collected per rollout (`n_batch`), "
+                                                               "some samples won't be used."
+                                                               )
                 batch_size = self.n_batch // self.nminibatches
                 t_start = time.time()
                 frac = 1.0 - (update - 1.0) / n_updates
@@ -415,6 +424,8 @@ class PPO2(ActorCriticRLModel):
             "observation_space": self.observation_space,
             "action_space": self.action_space,
             "n_envs": self.n_envs,
+            "n_cpu_tf_sess": self.n_cpu_tf_sess,
+            "seed": self.seed,
             "_vectorize_action": self._vectorize_action,
             "policy_kwargs": self.policy_kwargs
         }

@@ -15,6 +15,7 @@ from stable_baselines import logger
 from stable_baselines.common import tf_util, OffPolicyRLModel, SetVerbosity, TensorboardWriter
 from stable_baselines.common.vec_env import VecEnv
 from stable_baselines.common.mpi_adam import MpiAdam
+from stable_baselines.common.math_util import unscale_action, scale_action
 from stable_baselines.ddpg.policies import DDPGPolicy
 from stable_baselines.common.mpi_running_mean_std import RunningMeanStd
 from stable_baselines.a2c.utils import total_episode_reward_logger
@@ -127,7 +128,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev, verb
         if var in get_perturbable_vars(actor):
             if verbose >= 2:
                 logger.info('  {} <- {} + noise'.format(perturbed_var.name, var.name))
-            # Add gaussian noise to the parameter
+            # Add Gaussian noise to the parameter
             updates.append(tf.assign(perturbed_var,
                                      var + tf.random_normal(tf.shape(var), mean=0., stddev=param_noise_stddev)))
         else:
@@ -156,7 +157,7 @@ class DDPG(OffPolicyRLModel):
     :param eval_env: (Gym Environment) the evaluation environment (can be None)
     :param nb_train_steps: (int) the number of training steps
     :param nb_rollout_steps: (int) the number of rollout steps
-    :param nb_eval_steps: (int) the number of evalutation steps
+    :param nb_eval_steps: (int) the number of evaluation steps
     :param param_noise: (AdaptiveParamNoiseSpec) the parameter noise type (can be None)
     :param action_noise: (ActionNoise) the action noise type (can be None)
     :param param_noise_adaption_interval: (int) apply param noise every N steps
@@ -174,7 +175,7 @@ class DDPG(OffPolicyRLModel):
     :param clip_norm: (float) clip the gradients (disabled if None)
     :param reward_scale: (float) the value the reward should be scaled by
     :param render: (bool) enable rendering of the environment
-    :param render_eval: (bool) enable rendering of the evalution environment
+    :param render_eval: (bool) enable rendering of the evaluation environment
     :param memory_limit: (int) the max number of transitions to store, size of the replay buffer
 
         .. deprecated:: 2.6.0
@@ -190,8 +191,12 @@ class DDPG(OffPolicyRLModel):
     :param policy_kwargs: (dict) additional arguments to be passed to the policy on creation
     :param full_tensorboard_log: (bool) enable additional logging when using tensorboard
         WARNING: this logging can take a lot of space quickly
+    :param seed: (int) Seed for the pseudo-random generators (python, numpy, tensorflow).
+        If None (default), use random seed. Note that if you want completely deterministic
+        results, you must set `n_cpu_tf_sess` to 1.
+    :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
+        If None, the number of cpu of the current machine will be used.
     """
-
     def __init__(self, policy, env, gamma=0.99, memory_policy=None, eval_env=None, nb_train_steps=50,
                  nb_rollout_steps=100, nb_eval_steps=100, param_noise=None, action_noise=None,
                  normalize_observations=False, tau=0.001, batch_size=128, param_noise_adaption_interval=50,
@@ -199,11 +204,12 @@ class DDPG(OffPolicyRLModel):
                  return_range=(-np.inf, np.inf), actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1.,
                  render=False, render_eval=False, memory_limit=None, buffer_size=50000, random_exploration=0.0,
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
-                 full_tensorboard_log=False):
+                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=1):
 
         super(DDPG, self).__init__(policy=policy, env=env, replay_buffer=None,
                                    verbose=verbose, policy_base=DDPGPolicy,
-                                   requires_vec_env=False, policy_kwargs=policy_kwargs)
+                                   requires_vec_env=False, policy_kwargs=policy_kwargs,
+                                   seed=seed, n_cpu_tf_sess=n_cpu_tf_sess)
 
         # Parameters.
         self.gamma = gamma
@@ -307,7 +313,7 @@ class DDPG(OffPolicyRLModel):
     def _get_pretrain_placeholders(self):
         policy = self.policy_tf
         # Rescale
-        deterministic_action = self.actor_tf * np.abs(self.action_space.low)
+        deterministic_action = unscale_action(self.action_space, self.actor_tf)
         return policy.obs_ph, self.actions, deterministic_action
 
     def setup_model(self):
@@ -320,7 +326,8 @@ class DDPG(OffPolicyRLModel):
 
             self.graph = tf.Graph()
             with self.graph.as_default():
-                self.sess = tf_util.single_threaded_session(graph=self.graph)
+                self.set_random_seed(self.seed)
+                self.sess = tf_util.make_session(num_cpu=self.n_cpu_tf_sess, graph=self.graph)
 
                 self.replay_buffer = ReplayBuffer(self.buffer_size)
 
@@ -616,7 +623,6 @@ class DDPG(OffPolicyRLModel):
         action = action.flatten()
         if self.action_noise is not None and apply_noise:
             noise = self.action_noise()
-            assert noise.shape == action.shape
             action += noise
         action = np.clip(action, -1, 1)
         return action, q_value
@@ -797,7 +803,7 @@ class DDPG(OffPolicyRLModel):
                 self.param_noise_stddev: self.param_noise.current_stddev,
             })
 
-    def learn(self, total_timesteps, callback=None, seed=None, log_interval=100, tb_log_name="DDPG",
+    def learn(self, total_timesteps, callback=None, log_interval=100, tb_log_name="DDPG",
               reset_num_timesteps=True, replay_wrapper=None):
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
@@ -807,14 +813,13 @@ class DDPG(OffPolicyRLModel):
 
         with SetVerbosity(self.verbose), TensorboardWriter(self.graph, self.tensorboard_log, tb_log_name, new_tb_log) \
                 as writer:
-            self._setup_learn(seed)
+            self._setup_learn()
 
             # a list for tensorboard logging, to prevent logging with the same step number, if it already occured
             self.tb_seen_steps = []
 
             rank = MPI.COMM_WORLD.Get_rank()
-            # we assume symmetric actions.
-            assert np.all(np.abs(self.env.action_space.low) == self.env.action_space.high)
+
             if self.verbose >= 2:
                 logger.log('Using agent with the following configuration:')
                 logger.log(str(self.__dict__.items()))
@@ -865,13 +870,17 @@ class DDPG(OffPolicyRLModel):
                                 self.env.render()
 
                             # Randomly sample actions from a uniform distribution
-                            # with a probabilty self.random_exploration (used in HER + DDPG)
+                            # with a probability self.random_exploration (used in HER + DDPG)
                             if np.random.rand() < self.random_exploration:
-                                rescaled_action = action = self.action_space.sample()
+                                # actions sampled from action space are from range specific to the environment
+                                # but algorithm operates on tanh-squashed actions therefore simple scaling is used
+                                unscaled_action = self.action_space.sample()
+                                action = scale_action(self.action_space, unscaled_action)
                             else:
-                                rescaled_action = action * np.abs(self.action_space.low)
+                                # inferred actions need to be transformed to environment action_space before stepping
+                                unscaled_action = unscale_action(self.action_space, action)
 
-                            new_obs, reward, done, info = self.env.step(rescaled_action)
+                            new_obs, reward, done, info = self.env.step(unscaled_action)
 
                             if writer is not None:
                                 ep_rew = np.array([reward]).reshape((1, -1))
@@ -950,8 +959,8 @@ class DDPG(OffPolicyRLModel):
                                     return self
 
                                 eval_action, eval_q = self._policy(eval_obs, apply_noise=False, compute_q=True)
-                                eval_obs, eval_r, eval_done, _ = self.eval_env.step(eval_action *
-                                                                                    np.abs(self.action_space.low))
+                                unscaled_action = unscale_action(self.action_space, eval_action)
+                                eval_obs, eval_r, eval_done, _ = self.eval_env.step(unscaled_action)
                                 if self.render_eval:
                                     self.eval_env.render()
                                 eval_episode_reward += eval_r
@@ -1036,7 +1045,7 @@ class DDPG(OffPolicyRLModel):
         observation = observation.reshape((-1,) + self.observation_space.shape)
         actions, _, = self._policy(observation, apply_noise=not deterministic, compute_q=False)
         actions = actions.reshape((-1,) + self.action_space.shape)  # reshape to the correct action shape
-        actions = actions * np.abs(self.action_space.low)  # scale the output for the prediction
+        actions = unscale_action(self.action_space, actions)  # scale the output for the prediction
 
         if not vectorized_env:
             actions = actions[0]
@@ -1088,6 +1097,8 @@ class DDPG(OffPolicyRLModel):
             "random_exploration": self.random_exploration,
             "policy": self.policy,
             "n_envs": self.n_envs,
+            "n_cpu_tf_sess": self.n_cpu_tf_sess,
+            "seed": self.seed,
             "_vectorize_action": self._vectorize_action,
             "policy_kwargs": self.policy_kwargs
         }

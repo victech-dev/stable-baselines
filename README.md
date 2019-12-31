@@ -65,6 +65,8 @@ Documentation: https://stable-baselines.readthedocs.io/en/master/guide/rl_zoo.ht
 
 ## Installation
 
+**Note:** Stabe-Baselines supports Tensorflow versions from 1.8.0 to 1.14.0. Support for Tensorflow 2 API is planned.
+
 ### Prerequisites
 Baselines requires python3 (>=3.5) with the development headers. You'll also need system packages CMake, OpenMPI and zlib. Those can be installed as follows
 
@@ -111,7 +113,9 @@ from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
 
 env = gym.make('CartPole-v1')
-env = DummyVecEnv([lambda: env])  # The algorithms require a vectorized environment to run
+# Optional: PPO2 requires a vectorized environment to run
+# the env is now wrapped automatically when passing it to the constructor
+# env = DummyVecEnv([lambda: env])
 
 model = PPO2(MlpPolicy, env, verbose=1)
 model.learn(total_timesteps=10000)
