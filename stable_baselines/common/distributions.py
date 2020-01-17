@@ -215,14 +215,13 @@ class MultiCategoricalProbabilityDistributionType(ProbabilityDistributionType):
 
 
 class DiagGaussianProbabilityDistributionType(ProbabilityDistributionType):
-    def __init__(self, size, squashed=False):
+    def __init__(self, size):
         """
         The probability distribution type for multivariate Gaussian input
 
         :param size: (int) the number of dimensions of the multivariate gaussian
         """
         self.size = size
-        self._squashed = squashed
 
     def probability_distribution_class(self):
         return DiagGaussianProbabilityDistribution
@@ -238,9 +237,6 @@ class DiagGaussianProbabilityDistributionType(ProbabilityDistributionType):
 
     def proba_distribution_from_latent(self, pi_latent_vector, vf_latent_vector, init_scale=1.0, init_bias=0.0):
         mean = linear(pi_latent_vector, 'pi', self.size, init_scale=init_scale, init_bias=init_bias)
-        if self._squashed:
-            with tf.variable_scope('pi'):
-                mean = tf.tanh(mean)
         logstd = tf.get_variable(name='pi/logstd', shape=[1, self.size], initializer=tf.zeros_initializer())
         pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
         q_values = linear(vf_latent_vector, 'q', self.size, init_scale=init_scale, init_bias=init_bias)
@@ -489,8 +485,7 @@ def make_proba_dist_type(ac_space):
     """
     if isinstance(ac_space, spaces.Box):
         assert len(ac_space.shape) == 1, "Error: the action space must be a vector"
-        squashed = getattr(ac_space, 'squashed', False)
-        return DiagGaussianProbabilityDistributionType(ac_space.shape[0], squashed=squashed)
+        return DiagGaussianProbabilityDistributionType(ac_space.shape[0])
     elif isinstance(ac_space, spaces.Discrete):
         return CategoricalProbabilityDistributionType(ac_space.n)
     elif isinstance(ac_space, spaces.MultiDiscrete):
