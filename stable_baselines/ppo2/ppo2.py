@@ -303,6 +303,16 @@ class PPO2(ActorCriticRLModel):
 
         return policy_loss, value_loss, policy_entropy, approxkl, clipfrac
 
+    # VICTECH
+    def rollout(self, total_timesteps):
+        runner = Runner(env=self.env, model=self, n_steps=total_timesteps, gamma=self.gamma, lam=self.lam)
+        if hasattr(self, "learn_rollout_callback"):
+            self.learn_rollout_callback(True)
+        runner.run()
+        if hasattr(self, "learn_rollout_callback"):
+            self.learn_rollout_callback(False)
+    # VICTECH
+
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2",
               reset_num_timesteps=True):
         # Transform to callable if needed
@@ -336,7 +346,15 @@ class PPO2(ActorCriticRLModel):
                 cliprange_now = self.cliprange(frac)
                 cliprange_vf_now = cliprange_vf(frac)
                 # true_reward is the reward without discount
+                ### VICTECH
+                if hasattr(self, "learn_rollout_callback"):
+                    self.learn_rollout_callback(True)
+                ### VICTECH
                 obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = runner.run()
+                ### VICTECH
+                if hasattr(self, "learn_rollout_callback"):
+                    self.learn_rollout_callback(False)
+                ### VICTECH
                 self.num_timesteps += self.n_batch
                 ep_info_buf.extend(ep_infos)
                 mb_loss_vals = []
